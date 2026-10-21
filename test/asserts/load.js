@@ -580,6 +580,60 @@ QUnit.module("load", function () {
         });
     });
 
+    QUnit.test("Load files with relative path components (zip slip)", function(assert) {
+        var done = assert.async();
+        var malicious = new JSZip();
+        malicious.file("../../evil.txt", "evil", {createFolders: false});
+        malicious.file("a/../../b/evil2.txt", "evil2", {createFolders: false});
+        malicious.file("safe/./file.txt", "safe", {createFolders: false});
+        malicious.file("../../evildir/", null, {dir: true, createFolders: false});
+        malicious.generateAsync({type: "string"})
+        .then(function (content) {
+            return JSZip.loadAsync(content);
+        })
+        .then(function (zip) {
+            var names = Object.keys(zip.files).sort();
+            assert.deepEqual(names, ["b/evil2.txt", "evil.txt", "evildir/", "safe/file.txt"], "every path was resolved");
+            for (var i = 0; i < names.length; i++) {
+                assert.ok(!/(^|\/)\.\.?(\/|$)/.test(names[i]), names[i] + " has no relative path component");
+                assert.equal(zip.files[names[i]].name, names[i], names[i] + " has a resolved name");
+            }
+            assert.ok(zip.files["evildir/"].dir, "the folder was loaded as a folder");
+            assert.equal(zip.file("evil.txt").unsafeOriginalName, "../../evil.txt", "the original name is kept");
+            assert.equal(zip.file("b/evil2.txt").unsafeOriginalName, "a/../../b/evil2.txt", "the original name is kept");
+            assert.equal(zip.file("safe/file.txt").unsafeOriginalName, "safe/./file.txt", "the original name is kept");
+            return zip.file("evil.txt").async("string");
+        })
+        .then(function(result) {
+            assert.equal(result, "evil", "the zip was correctly read.");
+            done();
+        })['catch'](function (e) {
+            JSZipTestUtils.assertNoError(e);
+            done();
+        });
+    });
+
+    QUnit.test("Load a zip slip entry next to a folder without trailing slash", function(assert) {
+        var done = assert.async();
+        // a zip with a "folder" entry (unix directory attributes but no trailing slash)
+        // and a "../../evil.txt" entry containing "hello\n"
+        var content = "UEsDBBQAAAAAAAAAIVAAAAAAAAAAAAAAAAAGAAAAZm9sZGVyUEsDBBQAAAAAAAAAIVAgMDo2BgAAAAYAAAAOAAAALi4vLi4vZXZpbC50eHRoZWxsbwpQSwECFAMUAAAAAAAAACFQAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAA7UEAAAAAZm9sZGVyUEsBAhQDFAAAAAAAAAAhUCAwOjYGAAAABgAAAA4AAAAAAAAAAAAAAKSBJAAAAC4uLy4uL2V2aWwudHh0UEsFBgAAAAACAAIAcAAAAFYAAAAAAA==";
+        JSZip.loadAsync(content, {base64: true})
+        .then(function (zip) {
+            assert.deepEqual(Object.keys(zip.files).sort(), ["evil.txt", "folder/"], "every path was resolved");
+            assert.ok(zip.files["folder/"].dir, "the folder was loaded as a folder");
+            assert.equal(zip.file("evil.txt").unsafeOriginalName, "../../evil.txt", "the original name is kept");
+            return zip.file("evil.txt").async("string");
+        })
+        .then(function(result) {
+            assert.equal(result, "hello\n", "the zip was correctly read.");
+            done();
+        })['catch'](function (e) {
+            JSZipTestUtils.assertNoError(e);
+            done();
+        });
+    });
+
     QUnit.module("not supported features");
 
     // zip -0 -X -e encrypted.zip Hello.txt
