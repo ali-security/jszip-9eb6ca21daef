@@ -1,0 +1,24 @@
+name: seal-build
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '12'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build browser bundles
+        run: npx grunt build
+      - name: Pack
+        run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jszip-tgz
+          path: jszip-3.5.0.tgz

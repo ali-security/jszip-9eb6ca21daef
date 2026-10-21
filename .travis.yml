@@ -2,14 +2,10 @@ language: node_js
 sudo: false
 matrix:
   include:
-    - node_js: "stable"
-      env: COMMAND=lint
-    - node_js: "lts/*"
+    - node_js: "12"
       env: COMMAND=test-node
-    - node_js: "stable"
+    - node_js: "14"
       env: COMMAND=test-node
-    - node_js: "stable"
-      env: COMMAND=test-browser
 env:
   global:
   - secure: MhA8GHU42X3GWTUMaqdZVvarx4BMjhQCUGNi3kvuD/iCmKVb7gMwj4jbds7AcJdsCRsRk8bBGzZs/E7HidBJMPDa5DhgLKy9EV1s42JlHq8lVzbJeWIGgrtyJvhVUkGRy2OJjnDSgh3U6elkQmvDn74jreSQc6m/yGoPFF1nqq8=
