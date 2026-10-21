@@ -17,6 +17,71 @@ QUnit.module("load", function () {
         })['catch'](JSZipTestUtils.assertNoError);
     });
 
+    JSZipTestUtils.testZipFile("Load files which shadow Object prototype methods", "ref/pollution.zip", function(assert, file) {
+        var done = assert.async();
+        assert.ok(typeof file === "string");
+        JSZip.loadAsync(file)
+        .then(function (zip) {
+            assert.notEqual(Object.getPrototypeOf(zip.files), zip.files.__proto__);
+            return zip.file("__proto__").async("string");        })
+        .then(function(result) {
+            assert.equal(result, "hello\n", "the zip was correctly read.");
+            done();
+        })['catch'](JSZipTestUtils.assertNoError);
+    });
+
+    JSZipTestUtils.testZipFile("Files which shadow Object prototype methods are all listed", "ref/pollution.zip", function(assert, file) {
+        var done = assert.async();
+        JSZip.loadAsync(file)
+        .then(function (zip) {
+            var names = [];
+            assert.equal(Object.getPrototypeOf(zip.files), null, "zip.files has no prototype");
+            zip.forEach(function (relativePath) {
+                names.push(relativePath);
+            });
+            assert.deepEqual(names.sort(), ["__proto__", "constructor", "toString"], "forEach lists every entry");
+            assert.equal(zip.file("hasOwnProperty"), null, "missing entries are not looked up on a prototype");
+            assert.equal(zip.file("valueOf"), null, "missing entries are not looked up on a prototype");
+            return zip.file("toString").async("string");
+        })
+        .then(function(result) {
+            assert.equal(result, "hello\n", "the zip was correctly read.");
+            done();
+        })['catch'](function (e) {
+            JSZipTestUtils.assertNoError(e);
+            done();
+        });
+    });
+
+    QUnit.test("Load files named hasOwnProperty / valueOf and regenerate the zip", function(assert) {
+        var done = assert.async();
+        // a zip with the entries "hasOwnProperty" and "valueOf", both containing "hello\n"
+        var content = "UEsDBBQAAAAAAAAAIVIgMDo2BgAAAAYAAAAOAAAAaGFzT3duUHJvcGVydHloZWxsbwpQSwMEFAAAAAAAAAAhUiAwOjYGAAAABgAAAAcAAAB2YWx1ZU9maGVsbG8KUEsBAhQAFAAAAAAAAAAhUiAwOjYGAAAABgAAAA4AAAAAAAAAAAAAAIABAAAAAGhhc093blByb3BlcnR5UEsBAhQAFAAAAAAAAAAhUiAwOjYGAAAABgAAAAcAAAAAAAAAAAAAAIABMgAAAHZhbHVlT2ZQSwUGAAAAAAIAAgBxAAAAXQAAAAAA";
+        JSZip.loadAsync(content, {base64: true})
+        .then(function (zip) {
+            var names = [];
+            zip.forEach(function (relativePath) {
+                names.push(relativePath);
+            });
+            assert.deepEqual(names, ["hasOwnProperty", "valueOf"], "forEach lists every entry");
+            assert.equal(zip.file(/./).length, 2, "file(regex) lists every entry");
+            return zip.generateAsync({type: "string"});
+        })
+        .then(function (generated) {
+            return JSZip.loadAsync(generated);
+        })
+        .then(function (reloaded) {
+            return reloaded.file("hasOwnProperty").async("string");
+        })
+        .then(function(result) {
+            assert.equal(result, "hello\n", "the regenerated zip was correctly read.");
+            done();
+        })['catch'](function (e) {
+            JSZipTestUtils.assertNoError(e);
+            done();
+        });
+    });
+
     JSZipTestUtils.testZipFile("load(string) handles bytes > 255", "ref/all.zip", function(assert, file) {
         var done = assert.async();
         // the method used to load zip with ajax will remove the extra bits.
